@@ -1,0 +1,306 @@
+import React, {Component} from 'react';
+import {View, Image, ScrollView, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {Card, WhiteSpace, WingBlank, Progress, Icon, Toast} from '@ant-design/react-native';
+import {post} from "../../config/fetch";
+import {APP_URL, mobileHttp} from "../../config/http";
+import loadingUtils from '../../utils/loadingUtils'
+
+const statusAry = [
+    {text: '未开工', color: '#e659a2'},
+    {text: '已开工', color: '#fbde00'},
+    {text: '已完工', color: '#74cc97'}
+]
+const modelId='asd123';
+export default class MyTaskList extends Component {
+
+    state = {
+        total: 0,
+        queryData: {
+            projectId: global.projectId,
+            modelId: modelId,
+            planStartTimeBegin: '',
+            planStartTimeEnd: '',
+            planEndTimeBegin: '',
+            planEndTimeEnd: '',
+            actualStartTimeBegin: '',
+            actualStartTimeEnd: '',
+            actualEndTimeBegin: '',
+            actualEndTimeEnd: '',
+            taskStatus:''
+        },
+        dataList: []
+    }
+
+    componentDidMount() {
+        this.getData();
+    }
+
+    pressItem = item => {
+        this.props.navigate('DetailTask', {name: item.name, id: item.id});
+    }
+
+
+    getData = (getQueryData) => {
+        loadingUtils.showLoading();
+        if (getQueryData)
+            this.setState(state => ({queryData: {...state.queryData, ...getQueryData}}), () => {
+                post(`${mobileHttp}${APP_URL}/app/schedule/task/mylist`, this.state.queryData).then(data => {
+                    if (data.code != 200)
+                        return;
+                    loadingUtils.dismissLoading();
+                    this.setState({dataList: data.data, total: data.data.length});
+                })
+            })
+        else
+            post(`${mobileHttp}${APP_URL}/app/schedule/task/mylist`, this.state.queryData).then(data => {
+                if (data.code != 200)
+                    return;
+                loadingUtils.dismissLoading();
+                this.setState({dataList: data.data, total: data.data.length});
+            })
+    }
+
+    changeStatusData=(id,status)=>{
+        post(`${mobileHttp}${APP_URL}/app/schedule/task/updateTaskStartStatus/${id}/${status}`, {}).then(data => {
+            console.log(data.data)
+            if (data.code != 200){
+                Toast.fail(data.message);
+                return;
+            }
+            Toast.success(data.message);
+        })
+    }
+
+
+    initDate = date => {
+        if (date)
+            return date.substr(0, 10)
+    }
+
+    showDrawer = () => {
+        const {openDrawer} = this.props;
+        if (openDrawer)
+            openDrawer();
+    }
+
+    onStart = id => {
+        this.changeStatusData(id,'0')
+    }
+
+    onEnd = id => {
+        this.changeStatusData(id,'1')
+    }
+
+    renderStatus = (status) => {
+        console.log(status)
+        let statusBadgeStyle = styles.statusBadge;
+        let statusBadgeColor = {
+            ...statusBadgeStyle, ...{
+                backgroundColor: statusAry[status].color
+            }
+        }
+        return (<View style={styles.statusWrapper}>
+            <Text style={styles.statusFont}>{statusAry[status].text}</Text>
+            <Text style={statusBadgeColor}></Text>
+        </View>)
+    }
+
+    renderStart = d => {
+        if (d.taskStatus == '0')
+            return <View style={styles.marginItem}>
+                <TouchableOpacity style={styles.item} onPress={() => {
+                    this.onStart(d.id)
+                }}>
+                    <Icon name="play-circle" size='sm' color='#74cc97'/>
+                    <Text>开工</Text>
+                </TouchableOpacity>
+            </View>
+        else if (d.taskStatus == '1')
+            return <View style={styles.marginItem}>
+                <Icon name="check" size='sm' color='#949494'/>
+                <Text>已开工</Text>
+            </View>
+        else
+            return <View style={styles.marginItem}>
+                <Icon name="check" size='sm' color='#949494'/>
+                <Text>已开工</Text>
+            </View>
+    }
+
+    renderSuccess = d => {
+        if (d.taskStatus == '0')
+            return <View style={styles.marginItem}>
+                <Icon name="check" size='sm' color='#949494'/>
+                <Text>完工</Text>
+            </View>
+        else if (d.taskStatus == '1')
+            return <View style={styles.marginItem}>
+                <TouchableOpacity style={styles.item} onPress={() => {
+                    this.onEnd(d.id)
+                }}>
+                    <Icon name="check" size='sm' color='#74cc97'/>
+                    <Text>完工</Text>
+                </TouchableOpacity>
+            </View>
+        else
+            return <View style={styles.marginItem}>
+                <Icon name="check" size='sm' color='#949494'/>
+                <Text>已完工</Text>
+            </View>
+    }
+
+
+    renderList = () => {
+        const {dataList} = this.state;
+        if (dataList.length)
+            return dataList.map((d, i) => (
+                <TouchableOpacity onPress={() => {
+                    this.pressItem(d.text)
+                }} key={i}>
+                    <Card>
+                        <Card.Body>
+                            <View style={styles.cardInfo}>
+                                <View style={styles.cardTitle}>
+                                    <Text>{d.text}</Text>
+                                    {this.renderStatus(d.taskStatus)}
+                                </View>
+                                <View style={styles.cardContent}>
+
+                                    <View style={styles.listWrapper}>
+                                        <View style={styles.marginItem}>
+                                            <Text style={styles.dateLabel}>计划开工日期:</Text>
+                                            <Text style={styles.date}>{this.initDate(d.planStartTime)}</Text>
+                                        </View>
+
+                                        <View style={styles.item}>
+                                            <Text style={styles.dateLabel}>计划完工日期:</Text>
+                                            <Text style={styles.date}>{this.initDate(d.planEndTime)}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.listWrapper}>
+                                        <View style={styles.marginItem}>
+                                            <Text style={styles.dateLabel}>实际开工日期:</Text>
+                                            <Text style={styles.date}>{this.initDate(d.actualStartTime)}</Text>
+                                        </View>
+
+                                        <View style={styles.item}>
+                                            <Text style={styles.dateLabel}>实际完工日期:</Text>
+                                            <Text style={styles.date}>{this.initDate(d.actualEndTime)}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View style={styles.listWrapperLast}>
+
+                                        <View style={styles.marginItem}>
+                                            <View style={styles.progress}>
+                                                <Progress percent={d.progress}/>
+                                            </View>
+                                            <Text>{d.progress}%</Text>
+                                        </View>
+
+                                        <View style={styles.item}>
+                                            {this.renderStart(d)}
+                                            {this.renderSuccess(d)}
+                                        </View>
+                                    </View>
+
+                                </View>
+                            </View>
+                        </Card.Body>
+                    </Card>
+                    <WhiteSpace size="md"/>
+                </TouchableOpacity>
+            ))
+    }
+
+
+    render() {
+        const {total} = this.state;
+        return (
+            <View style={styles.wrapper}>
+                <View style={styles.listTitle}>
+                    <Text>共计{total}个</Text>
+                    <TouchableOpacity onPress={this.showDrawer}>
+                        <Icon name="filter" size="md"/>
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView  style={styles.wrapper}>
+                    <WingBlank size="md">
+                        {this.renderList()}
+                    </WingBlank>
+                </ScrollView>
+            </View>
+        );
+    }
+}
+
+const styles = StyleSheet.create({
+    wrapper: {
+        height: '100%'
+    },
+    listTitle: {
+        padding: 6,
+        height: 30,
+        flexDirection: 'row',
+        justifyContent: 'space-between'
+    },
+    cardInfo: {
+        flex: 1,
+        marginLeft: 10,
+        marginRight: 10
+    },
+    cardTitle: {
+        flexDirection: 'row',
+        justifyContent: 'space-between'
+    },
+    statusWrapper: {
+        flexDirection: 'row',
+        marginRight: 6,
+    },
+    statusFont: {
+        color: '#ccc'
+    },
+    cardContent: {
+        color: '#ccc'
+    },
+    statusBadge: {
+        width: 10,
+        height: 10,
+        borderRadius: 10,
+        marginLeft: 6,
+        marginTop: 6
+    },
+    listWrapper: {
+        flexDirection: 'row',
+        marginBottom: 4
+    },
+    listWrapperLast: {
+        flexDirection: 'row'
+    },
+    marginItem: {
+        width: '50%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 6
+    },
+    item: {
+        width: '50%',
+        flexDirection: 'row',
+        alignItems: 'center'
+    },
+    dateLabel: {
+        color: '#ccc',
+        marginRight: 6
+    },
+    progress: {
+        flex: 1,
+        height: 4,
+        marginRight: 10
+    },
+    btnWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center'
+    }
+})
